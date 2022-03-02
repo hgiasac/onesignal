@@ -321,7 +321,7 @@ type NotificationRequest struct {
 	// https://documentation.onesignal.com/docs/ios-relevance-score
 	IOSRelevanceScore float32 `json:"ios_relevance_score,omitempty"`
 	// iOS 15+ Focus Modes and Interruption Levels indicate the priority and delivery timing of a notification, to ‘interrupt’ the user.
-	IosInterruptionLevel IOSInterruptionLevel `json:"ios_interruption_level,omitempty"`
+	IOSInterruptionLevel IOSInterruptionLevel `json:"ios_interruption_level,omitempty"`
 
 	Filters    interface{} `json:"filters,omitempty"`
 	ExternalID string      `json:"external_id,omitempty"`

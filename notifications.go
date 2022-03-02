@@ -48,6 +48,17 @@ const (
 	HuaweiMsgTypeMessage HuaweiMsgType = "message"
 )
 
+// AndroidBackgroundLayout allows setting a background image for the notification. This is a JSON object containing the following keys.
+// https://documentation.onesignal.com/docs/android-customizations#section-background-images
+type AndroidBackgroundLayout struct {
+	// Asset file, android resource name, or URL to remote image.
+	Image string `json:"image,omitempty"`
+	// Title text color ARGB Hex format. Example(Blue): "FF0000FF".
+	HeadingsColor string `json:"headings_color,omitempty"`
+	// Body text color ARGB Hex format. Example(Red): "FFFF0000"
+	ContentsColor string `json:"contents_color,omitempty"`
+}
+
 // NotificationsService handles communication with the notification related
 // methods of the OneSignal API.
 type NotificationsService struct {
@@ -167,24 +178,54 @@ type NotificationRequest struct {
 	Data interface{} `json:"data,omitempty"`
 	// iOS 8.0+, Android 4.1+, and derivatives like Amazon: Buttons to add to the notification. Icon only works for Android.
 	// Buttons show in reverse order of array position i.e. Last item in array shows as first button on device.
-	Buttons   interface{} `json:"buttons,omitempty"`
-	IconType  string      `json:"icon_type,omitempty"`
-	SmallIcon string      `json:"small_icon,omitempty"`
-	LargeIcon string      `json:"large_icon,omitempty"`
+	Buttons  interface{} `json:"buttons,omitempty"`
+	IconType string      `json:"icon_type,omitempty"`
 
+	// Icon shown in the status bar and on the top left of the notification. Set the icon name without the file extension.
+	// If not set a bell icon will be used or ic_stat_onesignal_default if you have set this resource name.
+	// https://documentation.onesignal.com/docs/customize-notification-icons
+	SmallIcon string `json:"small_icon,omitempty"`
+	// Can be a drawable resource name (exclude file extension) or a URL.
+	// https://documentation.onesignal.com/docs/customize-notification-icons
+	LargeIcon string `json:"large_icon,omitempty"`
+	// Icon shown in the status bar and on the top left of the notification.
+	// Use an Android resource path (E.g. /drawable/small_icon).
+	// Defaults to your app icon if not set.
+	HuaweiSmallIcon string `json:"huawei_small_icon,omitempty"`
+	// Can be a drawable resource name or a URL.
+	HuaweiLargeIcon string `json:"huawei_large_icon,omitempty"`
+	// If not set a bell icon will be used or ic_stat_onesignal_default if you have set this resource name.
+	ADMSmallIcon string `json:"adm_small_icon,omitempty"`
+	// If blank the small_icon is used. Can be a drawable resource name or a URL.
+	ADMLargeIcon string `json:"adm_large_icon,omitempty"`
+	// This flag is not used for web push For web push, please see chrome_web_icon instead.
+	// The local URL to an icon to use. If blank, the app icon will be used.
+	ChromeIcon string `json:"chrome_icon,omitempty"`
+	// Sets the web push notification's icon. An image URL linking to a valid image. Common image types are supported; GIF will not animate.
+	// We recommend 256x256 (at least 80x80) to display well on high DPI devices.
+	ChromeWebIcon string `json:"chrome_web_icon,omitempty"`
+	// Sets the web push notification's icon for Firefox. An image URL linking to a valid image.
+	// Common image types are supported; GIF will not animate. We recommend 256x256 (at least 80x80) to display well on high DPI devices.
+	FirefoxIcon string `json:"firefox_icon,omitempty"`
+
+	// Huawei: Picture to display in the expanded view. Can be a drawable resource name or a URL
+	HuaweiBigPicture string `json:"huawei_big_picture,omitempty"`
+	// Chrome 56+: Sets the web push notification's large image to be shown below the notification's title and text.
+	ChromeWebImage string `json:"chrome_web_image,omitempty"`
+	// Sets the web push notification icon for Android devices in the notification shade.
+	// https://documentation.onesignal.com/docs/web-push-notification-icons#section-badge
+	ChromeWebBadge string `json:"chrome_web_badge,omitempty"`
 	// Chrome 48+: Add action buttons to the notification. The id field is required.
 	WebButtons interface{} `json:"web_buttons,omitempty"`
 	// Android: Picture to display in the expanded view. Can be a drawable resource name or a URL.
-	BigPicture   string `json:"big_picture,omitempty"`
-	ADMSmallIcon string `json:"adm_small_icon,omitempty"`
-	ADMLargeIcon string `json:"adm_large_icon,omitempty"`
+	BigPicture string `json:"big_picture,omitempty"`
 	// Amazon: Picture to display in the expanded view. Can be a drawable resource name or a URL.
 	ADMBigPicture string `json:"adm_big_picture,omitempty"`
-	ChromeIcon    string `json:"chrome_icon,omitempty"`
+	// Android Allowing setting a background image for the notification. This is a JSON object containing the following keys.
+	// https://documentation.onesignal.com/docs/android-customizations#section-background-images
+	AndroidBackgroundLayout AndroidBackgroundLayout `json:"android_background_layout,omitempty"`
 	// ChromeApp: Large picture to display below the notification text. Must be a local URL.
 	ChromeBigPicture string `json:"chrome_big_picture,omitempty"`
-	ChromeWebIcon    string `json:"chrome_web_icon,omitempty"`
-	FirefoxIcon      string `json:"firefox_icon,omitempty"`
 	// The URL to open in the browser when a user clicks on the notification.
 	URL string `json:"url,omitempty"`
 	// Same as url but only sent to app platforms.
@@ -230,7 +271,8 @@ type NotificationRequest struct {
 	// If the parameter is not included, the default behavior is to apply frequency capping if the setting is enabled for the app.
 	// Setting the parameter to false will override the frequency capping, meaning that the notification will be sent without considering frequency capping.
 	EnableFrequencyCap bool `json:"enable_frequency_cap,omitempty"`
-
+	// Sets the devices LED notification light if the device has one. ARGB Hex format.
+	// deprecated: this field doesn't work on Android 8 (Oreo) and newer devices!
 	AndroidLEDColor string `json:"android_led_color,omitempty"`
 	// Sets the devices LED notification light if the device has one. ARGB Hex format.
 	// deprecated: this field doesn't work on Android 8 (Oreo) and newer devices!
@@ -289,14 +331,16 @@ type NotificationRequest struct {
 	// Use "data" or "message" depending on the type of notification you are sending
 	// https://documentation.onesignal.com/docs/data-notifications
 	HuaweiMsgType string `json:"huawei_msg_type,omitempty"`
-	// Huawei: Picture to display in the expanded view. Can be a drawable resource name or a URL
-	HuaweiBigPicture string `json:"huawei_big_picture,omitempty"`
-	// Chrome 56+: Sets the web push notification's large image to be shown below the notification's title and text.
-	ChromeWebImage string `json:"chrome_web_image,omitempty"`
+
 	// The Android Oreo Notification Category to send the notification under.
 	AndroidChannelID string `json:"android_channel_id,omitempty"`
+	// Use this if you have client side Android Oreo Channels you have already defined in your app with code.
+	ExistingAndroidChannelID string `json:"existing_android_channel_id,omitempty"`
 	// The Android Oreo Notification Category to send the notification under
 	HuaweiChannelID string `json:"huawei_channel_id,omitempty"`
+	// Use this if you have client side Android Oreo Channels you have already defined in your app with code.
+	HuaweiExistingChannelID string `json:"huawei_existing_channel_id,omitempty"`
+
 	// email specific content
 	EmailSubject string `json:"email_subject,omitempty"`
 	// Required unless template_id is set.

@@ -103,8 +103,8 @@ type NotificationRequest struct {
 	// mapped to the localized text you would like users to receive for that language.
 	// Required for Huawei
 	// Web Push requires a heading but can be omitted from request since defaults to the Site Name set in OneSignal Settings.
-	Headings map[string]string      `json:"headings,omitempty"`
-	Subtitle map[string]interface{} `json:"subtitle,omitempty"`
+	Headings map[string]string `json:"headings,omitempty"`
+	Subtitle map[string]string `json:"subtitle,omitempty"`
 	// Indicates whether to send to all devices registered under your app's Apple iOS platform.
 	IsIOS bool `json:"isIos,omitempty"`
 	// Indicates whether to send to all devices registered under your app's Google Android platform.

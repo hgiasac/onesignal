@@ -172,7 +172,7 @@ type NotificationRequest struct {
 	// iOS 10+	iOS can localize push notification messages on the client using special parameters such as loc-key.
 	// When using the Create Notification endpoint,you must include these parameters inside of a field called apns_alert.
 	// https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CreatingtheNotificationPayload.html#//apple_ref/doc/uid/TP40008194-CH10-SW1
-	APNSAlert map[string]interface{} `json:"apns_alert"`
+	APNSAlert map[string]interface{} `json:"apns_alert,omitempty"`
 	// A custom map of data that is passed back to your app.
 	// Can use up to 2048 bytes of data.
 	Data interface{} `json:"data,omitempty"`

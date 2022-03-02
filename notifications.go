@@ -257,7 +257,7 @@ type NotificationRequest struct {
 	// Time To Live - In seconds. The notification will be expired if the device does not come back online within this time.
 	// The default is 259,200 seconds (3 days).
 	// Max value to set is 2419200 seconds (28 days).
-	TTL uint `json:"ttl"`
+	TTL uint `json:"ttl,omitempty"`
 	// Apps with throttling enabled
 	// - does not work with timezone or intelligent delivery, throttling limits will take precedence. Set to 0 if you want to use timezone or intelligent delivery.
 	// - the parameter value will be used to override the default application throttling value set from the dashboard settings.

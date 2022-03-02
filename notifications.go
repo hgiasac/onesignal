@@ -223,7 +223,7 @@ type NotificationRequest struct {
 	ADMBigPicture string `json:"adm_big_picture,omitempty"`
 	// Android Allowing setting a background image for the notification. This is a JSON object containing the following keys.
 	// https://documentation.onesignal.com/docs/android-customizations#section-background-images
-	AndroidBackgroundLayout AndroidBackgroundLayout `json:"android_background_layout,omitempty"`
+	AndroidBackgroundLayout *AndroidBackgroundLayout `json:"android_background_layout,omitempty"`
 	// ChromeApp: Large picture to display below the notification text. Must be a local URL.
 	ChromeBigPicture string `json:"chrome_big_picture,omitempty"`
 	// The URL to open in the browser when a user clicks on the notification.

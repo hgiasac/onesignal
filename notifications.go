@@ -59,6 +59,14 @@ type AndroidBackgroundLayout struct {
 	ContentsColor string `json:"contents_color,omitempty"`
 }
 
+// NotificationButton action button to the notification. The id field is required.
+type NotificationButton struct {
+	ID   string `json:"id"`
+	Text string `json:"text"`
+	Icon string `json:"icon,omitempty"`
+	URL  string `json:"url,omitempty"`
+}
+
 // NotificationsService handles communication with the notification related
 // methods of the OneSignal API.
 type NotificationsService struct {
@@ -178,8 +186,9 @@ type NotificationRequest struct {
 	Data interface{} `json:"data,omitempty"`
 	// iOS 8.0+, Android 4.1+, and derivatives like Amazon: Buttons to add to the notification. Icon only works for Android.
 	// Buttons show in reverse order of array position i.e. Last item in array shows as first button on device.
-	Buttons  interface{} `json:"buttons,omitempty"`
-	IconType string      `json:"icon_type,omitempty"`
+	Buttons []NotificationButton `json:"buttons,omitempty"`
+	// In iOS you can specify the type of icon to be used in an Action button as being either ['system', 'custom']
+	IconType string `json:"icon_type,omitempty"`
 
 	// Icon shown in the status bar and on the top left of the notification. Set the icon name without the file extension.
 	// If not set a bell icon will be used or ic_stat_onesignal_default if you have set this resource name.
@@ -216,7 +225,7 @@ type NotificationRequest struct {
 	// https://documentation.onesignal.com/docs/web-push-notification-icons#section-badge
 	ChromeWebBadge string `json:"chrome_web_badge,omitempty"`
 	// Chrome 48+: Add action buttons to the notification. The id field is required.
-	WebButtons interface{} `json:"web_buttons,omitempty"`
+	WebButtons []NotificationButton `json:"web_buttons,omitempty"`
 	// Android: Picture to display in the expanded view. Can be a drawable resource name or a URL.
 	BigPicture string `json:"big_picture,omitempty"`
 	// Amazon: Picture to display in the expanded view. Can be a drawable resource name or a URL.

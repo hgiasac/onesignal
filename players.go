@@ -103,7 +103,7 @@ type PlayerRequest struct {
 	ExternalUserIDAuthHash string `json:"external_user_id_auth_hash,omitempty"`
 	// Current iOS badge count displayed on the app icon
 	// NOTE: Not supported for apps created after June 2018, since badge count for apps created after this date are handled on the client.
-	BadgeCount int `json:"badge_count"`
+	BadgeCount int `json:"badge_count,omitempty"`
 }
 
 // PlayerListOptions specifies the parameters to the PlayersService.List method

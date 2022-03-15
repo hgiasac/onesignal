@@ -54,7 +54,7 @@ var sampleApp2 = &App{
 	APNSEnv:                          "sandbox",
 	APNSCertificates:                 "Your apns certificate",
 	SafariAPNSCertificate:            "Your Safari APNS certificate",
-	SafariSiteOrigin:                 "The homename for your website for Safari Push, including http or https",
+	SafariSiteOrigin:                 "The home name for your website for Safari Push, including http or https",
 	SafariPushID:                     "The certificate bundle ID for Safari Web Push",
 	SafariIcon16x16:                  "http://onesignal.com/safari_packages/e4e87830-b954-11e3-811d-f3b376925f15/16x16.png",
 	SafariIcon32x32:                  "http://onesignal.com/safari_packages/e4e87830-b954-11e3-811d-f3b376925f15/16x16@2.png",
@@ -65,14 +65,14 @@ var sampleApp2 = &App{
 	BasicAuthKey:                     "NGEwMGZmMjItY2NkNy0xMWUzLTk5ZDUtMDAwYzI5NDBlNjJj",
 }
 
-var sampleAppRequest = &AppRequest{
+var sampleAppRequest = AppRequest{
 	Name:                             "Your app 1",
 	GCMKey:                           "a gcm push key",
 	ChromeWebOrigin:                  "Chrome Web Push Site URL",
 	ChromeWebDefaultNotificationIcon: "http://yoursite.com/chrome_notification_icon",
 	ChromeWebSubDomain:               "your_site_name",
 	APNSEnv:                          "sandbox",
-	SafariSiteOrigin:                 "The homename for your website for Safari Push, including http or https",
+	SafariSiteOrigin:                 "The home name for your website for Safari Push, including http or https",
 	SafariIcon16x16:                  "http://onesignal.com/safari_packages/92911750-242d-4260-9e00-9d9034f139ce/16x16.png",
 	SafariIcon32x32:                  "http://onesignal.com/safari_packages/92911750-242d-4260-9e00-9d9034f139ce/16x16@2.png",
 	SafariIcon64x64:                  "http://onesignal.com/safari_packages/92911750-242d-4260-9e00-9d9034f139ce/32x32@2x.png",
@@ -82,21 +82,23 @@ var sampleAppRequest = &AppRequest{
 }
 
 func TestAppsService_List(t *testing.T) {
-	server, mux, client := setup(t)
+	server, mux, c := setupUserClient(t)
 	defer teardown(server)
-
+	if got, want := c.Apps.client, c; got != want {
+		t.Errorf("NewClient.AppsService.client is %v, want %v", got, want)
+	}
 	requestSent := false
 
 	mux.HandleFunc("/apps", func(w http.ResponseWriter, r *http.Request) {
 		requestSent = true
 
 		testMethod(t, r, "GET")
-		testHeader(t, r, "Authorization", "Basic "+client.userKey)
+		testHeader(t, r, "Authorization", "Basic "+c.apiKey)
 
 		fmt.Fprint(w, testhelper.LoadFixture(t, "app-list-response.json"))
 	})
 
-	apps, _, err := client.Apps.List()
+	apps, _, err := c.Apps.List()
 	if err != nil {
 		t.Errorf("List returned an error: %v", err)
 	}
@@ -112,7 +114,8 @@ func TestAppsService_List(t *testing.T) {
 }
 
 func TestAppsService_Get(t *testing.T) {
-	server, mux, client := setup(t)
+
+	server, mux, client := setupUserClient(t)
 	defer teardown(server)
 
 	requestSent := false
@@ -122,7 +125,7 @@ func TestAppsService_Get(t *testing.T) {
 		requestSent = true
 
 		testMethod(t, r, "GET")
-		testHeader(t, r, "Authorization", "Basic "+client.userKey)
+		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
 
 		fmt.Fprint(w, testhelper.LoadFixture(t, "app-get-response.json"))
 	})
@@ -143,7 +146,8 @@ func TestAppsService_Get(t *testing.T) {
 }
 
 func TestAppsService_Create(t *testing.T) {
-	server, mux, client := setup(t)
+
+	server, mux, client := setupUserClient(t)
 	defer teardown(server)
 
 	requestSent := false
@@ -153,9 +157,9 @@ func TestAppsService_Create(t *testing.T) {
 		requestSent = true
 
 		testMethod(t, r, "POST")
-		testHeader(t, r, "Authorization", "Basic "+client.userKey)
+		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
 
-		testBody(t, r, &AppRequest{}, appRequest)
+		testBody(t, r, &AppRequest{}, &appRequest)
 
 		fmt.Fprint(w, testhelper.LoadFixture(t, "app-get-response.json"))
 	})
@@ -176,7 +180,8 @@ func TestAppsService_Create(t *testing.T) {
 }
 
 func TestAppsService_Update(t *testing.T) {
-	server, mux, client := setup(t)
+
+	server, mux, client := setupUserClient(t)
 	defer teardown(server)
 
 	requestSent := false
@@ -187,9 +192,9 @@ func TestAppsService_Update(t *testing.T) {
 		requestSent = true
 
 		testMethod(t, r, "PUT")
-		testHeader(t, r, "Authorization", "Basic "+client.userKey)
+		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
 
-		testBody(t, r, &AppRequest{}, appRequest)
+		testBody(t, r, &AppRequest{}, &appRequest)
 
 		fmt.Fprint(w, testhelper.LoadFixture(t, "app-get-response.json"))
 	})

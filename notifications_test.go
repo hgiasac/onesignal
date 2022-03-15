@@ -12,45 +12,53 @@ import (
 )
 
 var sampleNotification1 = &Notification{
-	ID:         "481a2734-6b7d-11e4-a6ea-4b53294fa671",
-	Successful: 15,
-	Failed:     1,
-	Converted:  3,
-	Remaining:  0,
-	QueuedAt:   1415914655,
-	SendAfter:  1415914655,
-	Canceled:   false,
-	URL:        "https://yourWebsiteToOpen.com",
-	Headings: map[string]string{
-		"en": "English and default langauge heading",
-		"es": "Spanish language heading",
+	ID: "481a2734-6b7d-11e4-a6ea-4b53294fa671",
+	DeliveryStats: DeliveryStats{
+		Successful: 15,
+		Failed:     1,
+		Converted:  3,
 	},
-	Contents: map[string]string{
-		"en": "English and default content",
-		"es": "Hola",
+	NotificationRequest: NotificationRequest{
+		URL: "https://yourWebsiteToOpen.com",
+		Headings: map[string]string{
+			"en": "English and default langauge heading",
+			"es": "Spanish language heading",
+		},
+		Contents: map[string]string{
+			"en": "English and default content",
+			"es": "Hola",
+		},
 	},
+	Remaining: 0,
+	QueuedAt:  1415914655,
+	Canceled:  false,
+	SendAfter: 1415914655,
 }
 
 var sampleNotification2 = &Notification{
-	ID:         "b6b326a8-40aa-13e5-b91b-bf8bc3fa26f7",
-	Successful: 5,
-	Failed:     2,
-	Converted:  0,
-	Remaining:  0,
-	QueuedAt:   1415915123,
-	SendAfter:  1415915123,
-	Canceled:   false,
-	Data: map[string]interface{}{
-		"foo":  "bar",
-		"your": "custom metadata",
+	ID: "b6b326a8-40aa-13e5-b91b-bf8bc3fa26f7",
+	DeliveryStats: DeliveryStats{
+		Successful: 5,
+		Failed:     2,
+		Converted:  0,
 	},
-	Headings: map[string]string{
-		"en": "English and default langauge heading",
-		"es": "Spanish language heading",
-	},
-	Contents: map[string]string{
-		"en": "English and default content",
-		"es": "Hola",
+	Remaining: 0,
+	QueuedAt:  1415915123,
+	SendAfter: 1415915123,
+	Canceled:  false,
+	NotificationRequest: NotificationRequest{
+		Data: map[string]interface{}{
+			"foo":  "bar",
+			"your": "custom metadata",
+		},
+		Headings: map[string]string{
+			"en": "English and default langauge heading",
+			"es": "Spanish language heading",
+		},
+		Contents: map[string]string{
+			"en": "English and default content",
+			"es": "Hola",
+		},
 	},
 }
 
@@ -68,8 +76,7 @@ func TestNotificationsService_List(t *testing.T) {
 	requestSent := false
 
 	// NotificationListOptions
-	opt := &NotificationListOptions{
-		AppID:  "fake-app-id",
+	opt := NotificationListOptions{
 		Limit:  10,
 		Offset: 0,
 	}
@@ -85,7 +92,7 @@ func TestNotificationsService_List(t *testing.T) {
 		u.Scheme = ""
 		u.Host = ""
 		q := u.Query()
-		q.Set("app_id", opt.AppID)
+		q.Set("app_id", client.appID)
 		q.Set("limit", strconv.Itoa(opt.Limit))
 		q.Set("offset", strconv.Itoa(opt.Offset))
 		u.RawQuery = q.Encode()
@@ -126,9 +133,6 @@ func TestNotificationsService_Get(t *testing.T) {
 	requestSent := false
 
 	// NotificationGetOptions
-	opt := &NotificationGetOptions{
-		AppID: "fake-app-id",
-	}
 	notification := sampleNotification2
 
 	mux.HandleFunc("/notifications/"+notification.ID, func(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +146,7 @@ func TestNotificationsService_Get(t *testing.T) {
 		u.Scheme = ""
 		u.Host = ""
 		q := u.Query()
-		q.Set("app_id", opt.AppID)
+		q.Set("app_id", client.appID)
 		u.RawQuery = q.Encode()
 		want := u.String()
 		if got := r.URL.String(); got != want {
@@ -152,7 +156,7 @@ func TestNotificationsService_Get(t *testing.T) {
 		fmt.Fprint(w, testhelper.LoadFixture(t, "notification-get-response.json"))
 	})
 
-	getRes, _, err := client.Notifications.Get(notification.ID, opt)
+	getRes, _, err := client.Notifications.Get(notification.ID)
 	if err != nil {
 		t.Errorf("Get returned an error: %v", err)
 	}
@@ -311,48 +315,6 @@ func TestNotificationsService_Create_noSubscribedPlayers(t *testing.T) {
 	}
 }
 
-func TestNotificationsService_Update(t *testing.T) {
-	server, mux, client := setup(t)
-	defer teardown(server)
-
-	requestSent := false
-
-	notifID := "notif-fake-id"
-	opt := &NotificationUpdateOptions{
-		AppID:  "id123",
-		Opened: true,
-	}
-
-	mux.HandleFunc("/notifications/"+notifID, func(w http.ResponseWriter, r *http.Request) {
-		requestSent = true
-
-		testMethod(t, r, "PUT")
-		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
-
-		testBody(t, r, &NotificationUpdateOptions{}, opt)
-
-		fmt.Fprint(w, `{
-			"success": true
-		}`)
-	})
-
-	want := &SuccessResponse{
-		Success: true,
-	}
-	updateRes, _, err := client.Notifications.Update(notifID, opt)
-	if err != nil {
-		t.Errorf("Update returned an error: %v", err)
-	}
-
-	if !reflect.DeepEqual(updateRes, want) {
-		t.Errorf("Get returned %+v, want %+v", updateRes, want)
-	}
-
-	if requestSent == false {
-		t.Errorf("Request has not been sent")
-	}
-}
-
 func TestNotificationsService_Delete(t *testing.T) {
 	server, mux, client := setup(t)
 	defer teardown(server)
@@ -360,17 +322,12 @@ func TestNotificationsService_Delete(t *testing.T) {
 	requestSent := false
 
 	notifID := "notif-fake-id"
-	opt := &NotificationDeleteOptions{
-		AppID: "id123",
-	}
 
 	mux.HandleFunc("/notifications/"+notifID, func(w http.ResponseWriter, r *http.Request) {
 		requestSent = true
 
 		testMethod(t, r, "DELETE")
 		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
-
-		testBody(t, r, &NotificationDeleteOptions{}, opt)
 
 		fmt.Fprint(w, `{
 			"success": true
@@ -380,7 +337,7 @@ func TestNotificationsService_Delete(t *testing.T) {
 	want := &SuccessResponse{
 		Success: true,
 	}
-	deleteRes, _, err := client.Notifications.Delete(notifID, opt)
+	deleteRes, _, err := client.Notifications.Delete(notifID)
 	if err != nil {
 		t.Errorf("Delete returned an error: %v", err)
 	}

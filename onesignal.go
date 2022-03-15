@@ -15,39 +15,36 @@ const (
 	defaultBaseURL = "https://onesignal.com/api/v1"
 )
 
-// AuthKeyType specifies the token used to authenticate the requests
-// https://documentation.onesignal.com/docs/accounts-and-keys
-type AuthKeyType uint
-
-const (
-	APP AuthKeyType = iota
-	USER
-)
-
-// ClientOptions represent required OneSignal client options
-type ClientOptions struct {
-	BaseURL string
-	// Private key used for most API calls like sending push notifications and updating users.
-	// https://documentation.onesignal.com/docs/accounts-and-keys#rest-api-key
-	ApiKey string
-	// Another type of REST API key used for viewing Apps and related updates.
-	UserKey string
-	Client  *http.Client
-	IsDebug bool
-	Logger  func(...interface{})
-}
-
-// A Client manages communication with the OneSignal API.
+// Client manages communication with the OneSignal application API.
 type Client struct {
-	baseURL *url.URL
-	apiKey  string
-	userKey string
-	client  *http.Client
-	logger  func(...interface{})
+	*httpClient
+	appID string
 
-	Apps          *AppsService
 	Players       *PlayersService
 	Notifications *NotificationsService
+}
+
+// UserClient manages OneSignal applications.
+type UserClient struct {
+	*httpClient
+
+	Apps *AppsService
+}
+
+// NewUserClient returns a UserClient
+func NewUserClient(userKey string) (*UserClient, error) {
+
+	if userKey == "" {
+		return nil, errors.New("user auth key is required")
+	}
+
+	c := &UserClient{
+		httpClient: newHTTPClient(userKey),
+	}
+
+	c.Apps = &AppsService{client: c}
+
+	return c, nil
 }
 
 // SuccessResponse wraps the standard http.Response for several API methods
@@ -65,41 +62,68 @@ func (e *ErrorResponse) Error() string {
 	return fmt.Sprintf("OneSignal errors:\n - %s", strings.Join(e.Messages, "\n - "))
 }
 
-// New returns a new OneSignal API client.
-func New(options ClientOptions) (*Client, error) {
+// NewClient returns a new OneSignal API client.
+func NewClient(appID string, apiKey string) (*Client, error) {
 
-	if options.ApiKey == "" && options.UserKey == "" {
-		return nil, errors.New("require ApiKey or UserKey")
+	if appID == "" {
+		return nil, errors.New("app ID is required")
 	}
 
-	sBaseUrl := options.BaseURL
-	if sBaseUrl == "" {
-		sBaseUrl = defaultBaseURL
-	}
-
-	baseURL, err := url.Parse(sBaseUrl)
-	if err != nil {
-		return nil, err
-	}
-
-	httpClient := options.Client
-	if httpClient == nil {
-		httpClient = http.DefaultClient
+	if apiKey == "" {
+		return nil, errors.New("api key is required")
 	}
 
 	c := &Client{
-		baseURL: baseURL,
-		client:  httpClient,
-		apiKey:  options.ApiKey,
-		userKey: options.UserKey,
-		logger:  options.Logger,
+		appID:      appID,
+		httpClient: newHTTPClient(apiKey),
 	}
 
-	c.Apps = &AppsService{client: c}
 	c.Players = &PlayersService{client: c}
 	c.Notifications = &NotificationsService{client: c}
 
-	return c, err
+	return c, nil
+}
+
+// GetAppID returns the application ID
+func (c *Client) GetAppID() string {
+	return c.appID
+}
+
+type httpClient struct {
+	baseURL *url.URL
+	apiKey  string
+	client  *http.Client
+	logger  func(...interface{})
+}
+
+func newHTTPClient(apiKey string) *httpClient {
+	baseURL, _ := url.Parse(defaultBaseURL)
+	return &httpClient{
+		apiKey:  apiKey,
+		baseURL: baseURL,
+		client:  http.DefaultClient,
+	}
+}
+
+// SetBaseURL change the default OneSignal base URL
+func (c *httpClient) SetBaseURL(baseURL string) error {
+	sBaseURL, err := url.Parse(baseURL)
+	if err != nil {
+		panic(fmt.Sprintf("incorrect base url format: %s", baseURL))
+	}
+
+	c.baseURL = sBaseURL
+	return nil
+}
+
+// SetHTTPClient set custom http client
+func (c *httpClient) SetHTTPClient(client *http.Client) {
+	c.client = client
+}
+
+// SetHTTPClient set custom debug logger
+func (c *httpClient) SetLogger(logger func(args ...interface{})) {
+	c.logger = logger
 }
 
 // NewRequest creates an API request.
@@ -107,7 +131,7 @@ func New(options ClientOptions) (*Client, error) {
 // The value pointed to by body is JSON encoded and included as the request body.
 // The AuthKeyType will determine which authorization token (APP or USER) is
 // used for the request.
-func (c *Client) NewRequest(method, path string, body interface{}, authKeyType AuthKeyType) (*http.Request, error) {
+func (c *httpClient) NewRequest(method, path string, body interface{}) (*http.Request, error) {
 	u, err := url.Parse(c.baseURL.String() + path)
 	if err != nil {
 		return nil, err
@@ -138,12 +162,7 @@ func (c *Client) NewRequest(method, path string, body interface{}, authKeyType A
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
 
-	var token string
-	if authKeyType == APP {
-		token = fmt.Sprintf("Basic %s", c.apiKey)
-	} else {
-		token = fmt.Sprintf("Basic %s", c.userKey)
-	}
+	token := fmt.Sprintf("Basic %s", c.apiKey)
 	c.printDebug("[OneSignal] Authorization:", token)
 	req.Header.Add("Authorization", token)
 
@@ -153,7 +172,7 @@ func (c *Client) NewRequest(method, path string, body interface{}, authKeyType A
 // Sends an API request and returns the API response.
 // Return JSON decoded and stored in the value pointed to by v,
 // or an error if an API error has occurred.
-func (c *Client) Do(r *http.Request, v interface{}) (*http.Response, error) {
+func (c *httpClient) Do(r *http.Request, v interface{}) (*http.Response, error) {
 	// send the request
 	resp, err := c.client.Do(r)
 	if err != nil {
@@ -183,7 +202,7 @@ func (c *Client) Do(r *http.Request, v interface{}) (*http.Response, error) {
 	return resp, nil
 }
 
-func (c *Client) printDebug(args ...interface{}) {
+func (c *httpClient) printDebug(args ...interface{}) {
 	if c.logger != nil {
 		c.logger(args...)
 	}

@@ -15,30 +15,32 @@ func setup(t *testing.T) (*httptest.Server, *http.ServeMux, *Client) {
 	mux := http.NewServeMux()
 	server := httptest.NewServer(mux)
 
-	client, err := New(ClientOptions{
-		BaseURL: server.URL,
-		ApiKey:  "mock-api-key",
-		UserKey: "mock-user-key",
-	})
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	client := setupClient(t)
+	client.SetBaseURL(server.URL)
 	return server, mux, client
 }
 
 func setupClient(t *testing.T) *Client {
 
-	c, err := New(ClientOptions{
-		ApiKey:  "mock-api-key",
-		UserKey: "mock-user-key",
-	})
+	c, err := NewClient("fake-app-id", "mock-api-key")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return c
+}
+
+func setupUserClient(t *testing.T) (*httptest.Server, *http.ServeMux, *UserClient) {
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+
+	client, err := NewUserClient("mock-user-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.SetBaseURL(server.URL)
+
+	return server, mux, client
 }
 
 func teardown(server *httptest.Server) {
@@ -65,14 +67,12 @@ func testBody(t *testing.T, r *http.Request, body interface{}, want interface{})
 }
 
 func TestNewClient(t *testing.T) {
-	c, err := New(ClientOptions{})
+	_, err := NewClient("", "")
 	if err == nil {
 		t.Error("expected error, not nil")
 	}
 
-	c, err = New(ClientOptions{
-		ApiKey: "mock-api-key",
-	})
+	c := setupClient(t)
 
 	if got, want := c.baseURL.String(), defaultBaseURL; got != want {
 		t.Errorf("NewClient BaseURL is %v, want %v", got, want)
@@ -86,10 +86,6 @@ func TestNewClient(t *testing.T) {
 		t.Errorf("NewClient.PlayersService.client is %v, want %v", got, want)
 	}
 
-	if got, want := c.Apps.client, c; got != want {
-		t.Errorf("NewClient.AppsService.client is %v, want %v", got, want)
-	}
-
 	if got, want := c.Notifications.client, c; got != want {
 		t.Errorf("NewClient.NotificationsService.client is %v, want %v", got, want)
 	}
@@ -98,13 +94,8 @@ func TestNewClient(t *testing.T) {
 func TestCustomHTTPClient(t *testing.T) {
 	httpClient := &http.Client{}
 
-	c, err := New(ClientOptions{
-		Client: httpClient,
-		ApiKey: "mock-api-key",
-	})
-	if err != nil {
-		t.Error(err)
-	}
+	c := setupClient(t)
+	c.SetHTTPClient(httpClient)
 
 	if got, want := c.client, httpClient; got != want {
 		t.Errorf("NewClient Client is %v, want %v", got, want)
@@ -118,9 +109,8 @@ func TestNewRequest(t *testing.T) {
 	method := "GET"
 	inURL, outURL := "foo", defaultBaseURL+"foo"
 	inBody := struct{ Foo string }{Foo: "Bar"}
-	authKeyType := APP
 	outBody := `{"Foo":"Bar"}` + "\n"
-	req, _ := c.NewRequest(method, inURL, inBody, authKeyType)
+	req, _ := c.NewRequest(method, inURL, inBody)
 
 	// test the HTTP method
 	if got, want := req.Method, method; got != want {
@@ -146,15 +136,15 @@ func TestNewRequest(t *testing.T) {
 func TestNewRequest_userKeyType(t *testing.T) {
 	c := setupClient(t)
 
-	req, _ := c.NewRequest("GET", "foo", nil, USER)
+	req, _ := c.NewRequest("GET", "foo", nil)
 
-	testHeader(t, req, "Authorization", "Basic mock-user-key")
+	testHeader(t, req, "Authorization", "Basic mock-api-key")
 }
 
 func TestNewRequest_emptyBody(t *testing.T) {
 	c := setupClient(t)
 
-	req, err := c.NewRequest("GET", "/", nil, APP)
+	req, err := c.NewRequest("GET", "/", nil)
 
 	if err != nil {
 		t.Fatalf("NewRequest returned unexpected error: %v", err)
@@ -177,7 +167,7 @@ func TestDo(t *testing.T) {
 		fmt.Fprint(w, `{"A":"a"}`)
 	})
 
-	req, _ := client.NewRequest("GET", "/", nil, APP)
+	req, _ := client.NewRequest("GET", "/", nil)
 	body := new(foo)
 	client.Do(req, body)
 
@@ -195,7 +185,7 @@ func TestDo_httpError(t *testing.T) {
 		http.Error(w, "Bad Request", 400)
 	})
 
-	req, _ := client.NewRequest("GET", "/", nil, APP)
+	req, _ := client.NewRequest("GET", "/", nil)
 	_, err := client.Do(req, nil)
 
 	_, ok := err.(*ErrorResponse)

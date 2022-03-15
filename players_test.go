@@ -11,7 +11,7 @@ import (
 	"github.com/hgiasac/onesignal/testhelper"
 )
 
-var samplePlayerRequest = &PlayerRequest{
+var samplePlayerRequest = PlayerRequest{
 	Identifier:   "fake-identifier",
 	Language:     "fake-language",
 	Timezone:     -28800,
@@ -57,41 +57,6 @@ var samplePlayer = &Player{
 	BadgeCount:        0,
 }
 
-var samplePlayerOnSessionOptions = &PlayerOnSessionOptions{
-	Identifier:  "ce777617da7f548fe7a9ab6febb56cf39fba6d382000c0395666288d961ee566",
-	Language:    "en",
-	Timezone:    -28800,
-	GameVersion: "1.0",
-	DeviceOS:    "7.0.4",
-	AdID:        "fake-ad-id",
-	SDK:         "fake-sdk",
-	Tags: map[string]string{
-		"a":   "1",
-		"foo": "bar",
-	},
-}
-
-var samplePlayerOnPurchaseOptions = &PlayerOnPurchaseOptions{
-	Purchases: []Purchase{
-		{
-			SKU:    "foosku1",
-			Amount: 1.99,
-			ISO:    "BEL",
-		},
-		{
-			SKU:    "foosku2",
-			Amount: 2.99,
-			ISO:    "GER",
-		},
-	},
-	Existing: true,
-}
-
-var samplePlayerOnFocusOptions = &PlayerOnFocusOptions{
-	State:      "ping",
-	ActiveTime: 60,
-}
-
 func TestPlayersService_List(t *testing.T) {
 	server, mux, client := setup(t)
 	defer teardown(server)
@@ -100,7 +65,6 @@ func TestPlayersService_List(t *testing.T) {
 
 	// PlayerListOptions
 	opt := &PlayerListOptions{
-		AppID:  "fake-app-id",
 		Limit:  10,
 		Offset: 0,
 	}
@@ -116,7 +80,7 @@ func TestPlayersService_List(t *testing.T) {
 		u.Scheme = ""
 		u.Host = ""
 		q := u.Query()
-		q.Set("app_id", opt.AppID)
+		q.Set("app_id", client.appID)
 		q.Set("limit", strconv.Itoa(opt.Limit))
 		q.Set("offset", strconv.Itoa(opt.Offset))
 		u.RawQuery = q.Encode()
@@ -155,7 +119,6 @@ func TestPlayersService_List_returnsError(t *testing.T) {
 
 	// PlayerListOptions
 	opt := &PlayerListOptions{
-		AppID:  "fake-app-id",
 		Limit:  10,
 		Offset: 0,
 	}
@@ -231,7 +194,7 @@ func TestPlayersService_Create(t *testing.T) {
 		testMethod(t, r, "POST")
 		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
 
-		testBody(t, r, &PlayerRequest{}, playerRequest)
+		testBody(t, r, &PlayerRequest{}, &playerRequest)
 
 		fmt.Fprint(w, `{
 			"success": true,
@@ -253,132 +216,11 @@ func TestPlayersService_Create(t *testing.T) {
 	}
 }
 
-func TestPlayersService_OnSession(t *testing.T) {
-	requestSent := false
-
-	server, mux, client := setup(t)
-	defer teardown(server)
-
-	opt := samplePlayerOnSessionOptions
-
-	mux.HandleFunc("/players/id123/on_session", func(w http.ResponseWriter, r *http.Request) {
-		requestSent = true
-
-		testMethod(t, r, "POST")
-		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
-
-		testBody(t, r, &PlayerOnSessionOptions{}, opt)
-
-		fmt.Fprint(w, `{
-			"success": true
-		}`)
-	})
-
-	onSessionRes, _, err := client.Players.OnSession("id123", opt)
-	want := &SuccessResponse{
-		Success: true,
-	}
-
-	if err != nil {
-		t.Errorf("Shouldn't have returned an error: %+v", err)
-	}
-
-	if !reflect.DeepEqual(want, onSessionRes) {
-		t.Errorf("Request response: %+v, want %+v", onSessionRes, want)
-	}
-
-	if requestSent == false {
-		t.Errorf("Request has not been sent")
-	}
-}
-
-func TestPlayersService_OnPurchase(t *testing.T) {
-	requestSent := false
-
-	server, mux, client := setup(t)
-	defer teardown(server)
-
-	opt := samplePlayerOnPurchaseOptions
-
-	mux.HandleFunc("/players/id123/on_purchase", func(w http.ResponseWriter, r *http.Request) {
-		requestSent = true
-
-		testMethod(t, r, "POST")
-		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
-
-		testBody(t, r, &PlayerOnPurchaseOptions{}, opt)
-
-		fmt.Fprint(w, `{
-			"success": true
-		}`)
-	})
-
-	onPurchaseRes, _, err := client.Players.OnPurchase("id123", opt)
-	want := &SuccessResponse{
-		Success: true,
-	}
-
-	if err != nil {
-		t.Errorf("Shouldn't have returned an error: %+v", err)
-	}
-
-	if !reflect.DeepEqual(want, onPurchaseRes) {
-		t.Errorf("Request response: %+v, want %+v", onPurchaseRes, want)
-	}
-
-	if requestSent == false {
-		t.Errorf("Request has not been sent")
-	}
-}
-
-func TestPlayersService_OnFocus(t *testing.T) {
-	requestSent := false
-
-	server, mux, client := setup(t)
-	defer teardown(server)
-
-	opt := samplePlayerOnFocusOptions
-
-	mux.HandleFunc("/players/id123/on_focus", func(w http.ResponseWriter, r *http.Request) {
-		requestSent = true
-
-		testMethod(t, r, "POST")
-		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
-
-		testBody(t, r, &PlayerOnFocusOptions{}, opt)
-
-		fmt.Fprint(w, `{
-			"success": true
-		}`)
-	})
-
-	onFocusRes, _, err := client.Players.OnFocus("id123", opt)
-	want := &SuccessResponse{
-		Success: true,
-	}
-
-	if err != nil {
-		t.Errorf("Shouldn't have returned an error: %+v", err)
-	}
-
-	if !reflect.DeepEqual(want, onFocusRes) {
-		t.Errorf("Request response: %+v, want %+v", onFocusRes, want)
-	}
-
-	if requestSent == false {
-		t.Errorf("Request has not been sent")
-	}
-}
-
 func TestPlayersService_CSVExport(t *testing.T) {
 	requestSent := false
 
 	server, mux, client := setup(t)
 	defer teardown(server)
-
-	opt := &PlayerCSVExportOptions{
-		AppID: "id123",
-	}
 
 	mux.HandleFunc("/players/csv_export", func(w http.ResponseWriter, r *http.Request) {
 		requestSent = true
@@ -391,7 +233,7 @@ func TestPlayersService_CSVExport(t *testing.T) {
 		u.Scheme = ""
 		u.Host = ""
 		q := u.Query()
-		q.Set("app_id", opt.AppID)
+		q.Set("app_id", client.appID)
 		u.RawQuery = q.Encode()
 		want := u.String()
 		if got := r.URL.String(); got != want {
@@ -403,7 +245,7 @@ func TestPlayersService_CSVExport(t *testing.T) {
 		}`)
 	})
 
-	CSVExportRes, _, err := client.Players.CSVExport(opt)
+	CSVExportRes, _, err := client.Players.CSVExport()
 	want := &PlayerCSVExportResponse{
 		CSVFileURL: "https://example.com/foo.csv",
 	}
@@ -435,7 +277,7 @@ func TestPlayersService_Update(t *testing.T) {
 		testMethod(t, r, "PUT")
 		testHeader(t, r, "Authorization", "Basic "+client.apiKey)
 
-		testBody(t, r, &PlayerRequest{}, playerRequest)
+		testBody(t, r, &PlayerRequest{}, &playerRequest)
 
 		fmt.Fprint(w, `{
 			"success": true

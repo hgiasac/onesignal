@@ -1,6 +1,7 @@
 package onesignal
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -21,6 +22,9 @@ type DelayedOption string
 
 // Huawei Message Type
 type HuaweiMsgType string
+
+// Notification Kind
+type NotificationKind int
 
 const (
 	MessageTypePush  MessageType = "push"
@@ -46,6 +50,10 @@ const (
 
 	HuaweiMsgTypeData    HuaweiMsgType = "data"
 	HuaweiMsgTypeMessage HuaweiMsgType = "message"
+
+	NotificationKindDashboard NotificationKind = 0
+	NotificationKindAPI       NotificationKind = 1
+	NotificationKindAutomated NotificationKind = 2
 )
 
 // AndroidBackgroundLayout allows setting a background image for the notification. This is a JSON object containing the following keys.
@@ -73,20 +81,61 @@ type NotificationsService struct {
 	client *Client
 }
 
+type DeliveryStats struct {
+	// Number of notifications delivered to the Google/Apple/Windows servers.
+	Successful int `json:"successful"`
+	// Number of notifications that could not be delivered due to those devices being unsubscribed.
+	Failed int `json:"failed"`
+	// Number of notifications that could not be delivered due to an error.
+	// You can find more information by viewing the notification in the dashboard.
+	Errored int `json:"errored"`
+	// Number of devices that have clicked/tapped the notification.
+	Converted int `json:"converted"`
+	// Number of devices that confirmed receiving the notification aka Confirmed Deliveries.
+	Received int `json:"received"`
+}
+
 // Notification  represents a OneSignal notification.
 type Notification struct {
-	ID         string            `json:"id"`
-	Successful int               `json:"successful"`
-	Failed     int               `json:"failed"`
-	Converted  int               `json:"converted"`
-	Remaining  int               `json:"remaining"`
-	QueuedAt   int               `json:"queued_at"`
-	SendAfter  int               `json:"send_after"`
-	URL        string            `json:"url"`
-	Data       interface{}       `json:"data"`
-	Canceled   bool              `json:"canceled"`
-	Headings   map[string]string `json:"headings"`
-	Contents   map[string]string `json:"contents"`
+	NotificationRequest
+	DeliveryStats
+	ID string `json:"id"`
+	// Number of notifications that have not been sent out yet.
+	// This can mean either our system is still processing the notification or you have delayed options set.
+	Remaining int `json:"remaining"`
+	// Unix timestamp indicating when the notification was created
+	QueuedAt int `json:"queued_at"`
+	// Unix timestamp indicating when notification delivery completed.
+	// The delivery duration from start to finish can be calculated with completed_at - send_after.
+	CompletedAt int `json:"completed_at"`
+	//  Unix timestamp indicating when notification delivery should begin.
+	Canceled bool `json:"canceled"`
+	//  number of push notifications sent per minute. Paid Feature Only.
+	// If throttling is not enabled for the app or the notification, and for free accounts, null is returned.
+	// Refer to Throttling for more details.
+	ThrottleRatePerMinute int `json:"throttle_rate_per_minute"`
+	SendAfter             int `json:"send_after,omitempty"`
+	PlatformDeliveryStats struct {
+		Android            *DeliveryStats `json:"android,omitempty"`
+		IOS                *DeliveryStats `json:"ios,omitempty"`
+		AmazonFire         *DeliveryStats `json:"amazon_fire,omitempty"`
+		WindowsPhoneLegacy *DeliveryStats `json:"windows_phone_legacy,omitempty"`
+		ChromeExtension    *DeliveryStats `json:"chrome_extension,omitempty"`
+		ChromeWebPush      *DeliveryStats `json:"chrome_web_push,omitempty"`
+		Windows            *DeliveryStats `json:"windows,omitempty"`
+		SafariWebPush      *DeliveryStats `json:"safari_web_push,omitempty"`
+		FirefoxWebPush     *DeliveryStats `json:"firefox_web_push,omitempty"`
+		MacOS              *DeliveryStats `json:"mac_os,omitempty"`
+		AmazonAlexa        *DeliveryStats `json:"amazon_alexa,omitempty"`
+		Email              *DeliveryStats `json:"email,omitempty"`
+		SMS                *DeliveryStats `json:"sms,omitempty"`
+		EdgeWebPush        *DeliveryStats `json:"edge_web_push,omitempty"`
+	} `json:"platform_delivery_stats"`
+	Outcomes []struct {
+		ID          string `json:"id"`
+		Value       int64  `json:"value"`
+		Aggregation string `json:"aggregation"`
+	} `json:"outcomes,omitempty"`
 }
 
 // NotificationRequest represents a request to create a notification.
@@ -383,9 +432,27 @@ type NotificationCreateResponse struct {
 // NotificationListOptions specifies the parameters to the
 // NotificationsService.List method
 type NotificationListOptions struct {
-	AppID  string `json:"app_id"`
-	Limit  int    `json:"limit"`
-	Offset int    `json:"offset"`
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+	// Kind of notifications returned. Default (not set) is all notification types.
+	// Dashboard only is 0.
+	// API only is 1.
+	// Automated only is 3.
+	Kind *NotificationKind `json:"kind,omitempty"`
+}
+
+// NotificationGetOptions specifies the parameters to the
+// NotificationsService.Get method
+type NotificationGetOptions struct {
+	// Comma-separated list of names and the value (sum/count) for the returned outcome data.
+	OutcomeNames []string `json:"outcome_names"`
+	// Time range for the returned data.
+	// The values can be 1h (for the last 1 hour data), 1d (for the last 1 day data), or 1mo (for the last 1 month data).
+	OutcomeTimeRange string `json:"outcome_time_range"`
+	// Platform id. Refer device's platform ids for values.
+	OutcomePlatforms string `json:"outcome_platforms"`
+	// Attribution type for the outcomes. The values can be direct or influenced
+	OutcomeAttribution string `json:"outcome_attribution"`
 }
 
 // NotificationListResponse wraps the standard http.Response for the
@@ -397,19 +464,6 @@ type NotificationListResponse struct {
 	Notifications []Notification
 }
 
-// NotificationUpdateOptions specifies the parameters to the
-// NotificationsService.Get method
-type NotificationGetOptions struct {
-	AppID string `json:"app_id"`
-}
-
-// NotificationUpdateOptions specifies the parameters to the
-// NotificationsService.Update method
-type NotificationUpdateOptions struct {
-	AppID  string `json:"app_id"`
-	Opened bool   `json:"opened"`
-}
-
 // NotificationDeleteOptions specifies the parameters to the
 // NotificationsService.Delete method
 type NotificationDeleteOptions struct {
@@ -419,21 +473,26 @@ type NotificationDeleteOptions struct {
 // List the notifications.
 //
 // OneSignal API docs:
-// https://documentation.onesignal.com/docs/notifications-view-notifications
-func (s *NotificationsService) List(opt *NotificationListOptions) (*NotificationListResponse, *http.Response, error) {
+// https://documentation.onesignal.com/reference/view-notifications
+func (s *NotificationsService) List(opt ...NotificationListOptions) (*NotificationListResponse, *http.Response, error) {
 	// build the URL with the query string
 	u, err := url.Parse("/notifications")
 	if err != nil {
 		return nil, nil, err
 	}
 	q := u.Query()
-	q.Set("app_id", opt.AppID)
-	q.Set("limit", strconv.Itoa(opt.Limit))
-	q.Set("offset", strconv.Itoa(opt.Offset))
+	q.Set("app_id", s.client.appID)
+	if len(opt) > 0 {
+		q.Set("limit", strconv.Itoa(opt[0].Limit))
+		q.Set("offset", strconv.Itoa(opt[0].Offset))
+		if opt[0].Kind != nil {
+			q.Set("kind", strconv.Itoa(int(*opt[0].Kind)))
+		}
+	}
 	u.RawQuery = q.Encode()
 
 	// create the request
-	req, err := s.client.NewRequest("GET", u.String(), nil, APP)
+	req, err := s.client.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -450,19 +509,33 @@ func (s *NotificationsService) List(opt *NotificationListOptions) (*Notification
 // Get a single notification.
 //
 // OneSignal API docs:
-// https://documentation.onesignal.com/docs/notificationsid-view-notification
-func (s *NotificationsService) Get(notificationID string, opt *NotificationGetOptions) (*Notification, *http.Response, error) {
+// https://documentation.onesignal.com/reference/view-notification
+func (s *NotificationsService) Get(notificationID string, opt ...NotificationGetOptions) (*Notification, *http.Response, error) {
 	// build the URL with the query string
 	u, err := url.Parse("/notifications/" + notificationID)
 	if err != nil {
 		return nil, nil, err
 	}
 	q := u.Query()
-	q.Set("app_id", opt.AppID)
+	q.Set("app_id", s.client.appID)
+	if len(opt) > 0 {
+		if opt[0].OutcomeAttribution != "" {
+			q.Set("outcome_attribution", opt[0].OutcomeAttribution)
+		}
+		if opt[0].OutcomePlatforms != "" {
+			q.Set("outcome_platforms", opt[0].OutcomePlatforms)
+		}
+		if opt[0].OutcomeTimeRange != "" {
+			q.Set("outcome_time_range", opt[0].OutcomeTimeRange)
+		}
+		for _, n := range opt[0].OutcomeNames {
+			q.Set("outcome_names", n)
+		}
+	}
 	u.RawQuery = q.Encode()
 
 	// create the request
-	req, err := s.client.NewRequest("GET", u.String(), nil, APP)
+	req, err := s.client.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -488,7 +561,8 @@ func (s *NotificationsService) Create(opt *NotificationRequest) (*NotificationCr
 	}
 
 	// create the request
-	req, err := s.client.NewRequest("POST", u.String(), opt, APP)
+	opt.AppID = s.client.appID
+	req, err := s.client.NewRequest("POST", u.String(), opt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -502,45 +576,19 @@ func (s *NotificationsService) Create(opt *NotificationRequest) (*NotificationCr
 	return createRes, resp, err
 }
 
-// Update a notification.
-//
-// OneSignal API docs:
-// https://documentation.onesignal.com/docs/notificationsid-track-open
-func (s *NotificationsService) Update(notificationID string, opt *NotificationUpdateOptions) (*SuccessResponse, *http.Response, error) {
-	// build the URL
-	u, err := url.Parse("/notifications/" + notificationID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// create the request
-	req, err := s.client.NewRequest("PUT", u.String(), opt, APP)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	updateRes := &SuccessResponse{}
-	resp, err := s.client.Do(req, updateRes)
-	if err != nil {
-		return nil, resp, err
-	}
-
-	return updateRes, resp, err
-}
-
 // Delete a notification.
 //
 // OneSignal API docs:
 // https://documentation.onesignal.com/docs/notificationsid-cancel-notification
-func (s *NotificationsService) Delete(notificationID string, opt *NotificationDeleteOptions) (*SuccessResponse, *http.Response, error) {
+func (s *NotificationsService) Delete(notificationID string) (*SuccessResponse, *http.Response, error) {
 	// build the URL
-	u, err := url.Parse("/notifications/" + notificationID)
+	u, err := url.Parse(fmt.Sprintf("/notifications/%s?app_id=%s", notificationID, s.client.appID))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// create the request
-	req, err := s.client.NewRequest("DELETE", u.String(), opt, APP)
+	req, err := s.client.NewRequest("DELETE", u.String(), nil)
 	if err != nil {
 		return nil, nil, err
 	}
